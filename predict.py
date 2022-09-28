@@ -105,6 +105,7 @@ class predict_model():
         self.imshow(self.process_image(self.image_path), title = labels[0])
         # See: https://stackoverflow.com/questions/26984414/efficiently-sorting-a-numpy-array-in-descending-order
         order = np.arange(len(labels))[::-1]
+        # Here is a little unkown on how to show the result. Maybe you can give me more details on the output format
         for i in order:
             print(labels[i])
     
