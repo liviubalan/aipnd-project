@@ -37,8 +37,10 @@ class predict_model():
         for param in model.parameters():
             param.requires_grad = False
         model.classifier = checkpoint['classifier']
+        model.learning_rate = checkpoint['learning_rate']
         model.state_dict = checkpoint['state_dict']
         model.class_to_idx = checkpoint['class_to_idx']
+        model.optimizer_dict = checkpoint['optimizer_dict']
         model.modules = checkpoint['modules']
         self.model = model
     
@@ -98,16 +100,13 @@ class predict_model():
     def get_result(self):
         # DONE: Display an image along with the top 5 classes
         # See: "Part 4 - Fashion-MNIST (Solution)"
-        p, c = self.predict(self.image_path, self.model)
+        p, c = self.predict(self.image_path, self.model, self.top_k)
         p_cpu = p.data.cpu().numpy()[0]
         c_cpu = c.data.cpu().numpy()[0]
         labels = [self.cat_to_name[str(c)] for c in c_cpu]
         self.imshow(self.process_image(self.image_path), title = labels[0])
-        # See: https://stackoverflow.com/questions/26984414/efficiently-sorting-a-numpy-array-in-descending-order
-        order = np.arange(len(labels))[::-1]
-        # Here is a little unkown on how to show the result. Maybe you can give me more details on the output format
-        for i in order:
-            print(labels[i])
+        for i in range(0, len(labels)):
+            print("{}: {}".format(labels[i], p_cpu[i]))
     
     def psychic(self):
         self.load()

@@ -65,13 +65,21 @@ class train_model():
             return json.load(f)
     
     def build(self):
+        # According to https://pytorch.org/hub/pytorch_vision_densenet/ support for "densenet121" implies too much changes to current code
+        allowed_models = ['vgg13', 'vgg16', 'resnet50']
+        if self.arch not in allowed_models:
+            raise ValueError('Unspected arch {}. Try using one of {}.'.format(self.arch, ', '.join(allowed_models)))
         # See: https://gist.github.com/indraniel/da11c4f79c79b5e6bfb8
         func = getattr(models, self.arch)
         self.model = func(pretrained=True)
 
         # Freeze parameters so we don't backprop through them
         for param in self.model.parameters():
-            param.requires_grad = False
+            # See: https://discuss.pytorch.org/t/runtimeerror-element-0-of-variables-does-not-require-grad-and-does-not-have-a-grad-fn/11074
+            if self.arch == 'resnet50':
+                param.requires_grad = True
+            else:
+                param.requires_grad = False
 
         self.model.classifier = nn.Sequential(nn.Linear(25088, 512),
                                          nn.ReLU(),
@@ -110,7 +118,7 @@ class train_model():
                     accuracy = 0
                     self.model.eval()
                     with torch.no_grad():
-                        for inputs, labels in self.testloader:
+                        for inputs, labels in self.validloader:
                             inputs, labels = inputs.to(self.device), labels.to(self.device)
                             logps = self.model.forward(inputs)
                             batch_loss = self.criterion(logps, labels)
@@ -125,17 +133,20 @@ class train_model():
 
                     print(f"Epoch {epoch+1}/{self.epochs}.. "
                           f"Train loss: {running_loss/print_every:.3f}.. "
-                          f"Test loss: {test_loss/len(self.testloader):.3f}.. "
-                          f"Test accuracy: {accuracy/len(self.testloader):.3f}")
+                          f"Test loss: {test_loss/len(self.validloader):.3f}.. "
+                          f"Test accuracy: {accuracy/len(self.validloader):.3f}")
                     running_loss = 0
                     self.model.train()
     
     def save(self):
         checkpoint_path = self.save_dir + '/checkpoint.pth'
         self.model.class_to_idx = self.train_data.class_to_idx
+        # See: https://knowledge.udacity.com/questions/286164#286931
         checkpoint = {'classifier': self.model.classifier,
+                      'learning_rate': self.learning_rate,
                       'state_dict': self.model.state_dict(),
                       'class_to_idx': self.model.class_to_idx,
+                      'optimizer_dict': self.optimizer.state_dict(),
                       'modules': self.model.modules}
         torch.save(checkpoint, checkpoint_path)
     
@@ -154,9 +165,9 @@ parser = argparse.ArgumentParser()
 parser.add_argument("data_dir", help="data directory", type=str)
 parser.add_argument("--save_dir", help="save directory", type=str, default=".")
 parser.add_argument("--arch", help="arch", type=str, default="vgg16")
-parser.add_argument("--learning_rate", help="learning rate", type=float, default=0.003)
+parser.add_argument("--learning_rate", help="learning rate", type=float, default=0.001)
 parser.add_argument("--hidden_units", help="hidden units", type=int, default=512)
-parser.add_argument("--epochs", help="epochs", type=int, default=1)
+parser.add_argument("--epochs", help="epochs", type=int, default=3)
 parser.add_argument("--gpu", help="gpu", type=bool, default=True)
 args = parser.parse_args()
 
